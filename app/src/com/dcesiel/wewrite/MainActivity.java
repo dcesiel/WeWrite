@@ -1,8 +1,15 @@
 package com.dcesiel.wewrite;
 
-import android.os.Bundle;
+import java.util.List;
+
 import android.app.Activity;
+import android.os.Bundle;
 import android.view.Menu;
+import edu.umich.imlc.collabrify.client.CollabrifyClient;
+import edu.umich.imlc.collabrify.client.CollabrifyListener;
+import edu.umich.imlc.collabrify.client.CollabrifyParticipant;
+import edu.umich.imlc.collabrify.client.CollabrifySession;
+import edu.umich.imlc.collabrify.client.exceptions.CollabrifyException;
 
 public class MainActivity extends Activity {
 
@@ -10,6 +17,102 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        try
+        {
+          CollabrifyListener collabrifyListener = new CollabrifyListener()
+          {
+            
+            @Override
+            public void onSessionJoined(long maxOrderId, long baseFileSize)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onSessionEnd(long id)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onSessionCreated(long id)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onReceiveSessionList(List<CollabrifySession> sessionList)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onReceiveEvent(long orderId, int submissionRegistrationId,
+                String eventType, byte[] data)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onParticipantLeft(CollabrifyParticipant p)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onParticipantJoined(CollabrifyParticipant p)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onError(CollabrifyException e)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onDisconnect()
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public void onBaseFileUploadComplete(long baseFileSize)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+            
+            @Override
+            public byte[] onBaseFileChunkRequested(long currentBaseFileSize)
+            {
+              // TODO Auto-generated method stub
+              return null;
+            }
+            
+            @Override
+            public void onBaseFileChunkReceived(byte[] baseFileChunk)
+            {
+              // TODO Auto-generated method stub
+              
+            }
+          };
+          CollabrifyClient collabClient = new CollabrifyClient(this, "dcesiel@gmail.com", "dcesiel", 
+                            "441fall2013@umich.edu", "XY3721425NoScOpE", true, collabrifyListener);
+        }
+        catch(CollabrifyException e){
+          e.printStackTrace();
+        }
     }
 
 
