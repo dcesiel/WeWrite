@@ -6,37 +6,49 @@ import android.util.Log;
 
 public class UndoRedoStack
 {
-  private Stack<UndoRedoData> bufferStack = new Stack<UndoRedoData>();
-  private Stack<UndoRedoData> redoStack = new Stack<UndoRedoData>();
+  private Stack<Move> bufferStack = new Stack<Move>();
+  private Stack<Move> redoStack = new Stack<Move>();
   
-  public void push(UndoRedoData d){
+  public void push(Move d){
+    Log.i("UndoRedoStack", "Pushing " + "Start: " + d.start_coordinate + " Length: " + d.new_length + " to stack");
     bufferStack.push(d);
   }
   
-  public void undo(){
+  public Move undo(){
     if (!bufferStack.empty()){
-      UndoRedoData d = bufferStack.peek();
-      Log.i("UndoRedoStack", "Undoing: " + Character.toString(d.c));
+      Move d = bufferStack.peek();
+      Log.i("UndoRedoStack", "Undoing: " + d.change);
       redoStack.push(bufferStack.pop());
+      return d;
     }
     else{
       Log.i("UndoRedoStack", "Can't undo, bufferStack is empty");
     }
+    return null;
   }
   
-  public void redo(){
+  public Move redo(){
     if (!redoStack.empty()){
-      UndoRedoData d = redoStack.peek();
-      Log.i("UndoRedoStack", "Redoing: " + Character.toString(d.c));
+      Move d = redoStack.peek();
+      Log.i("UndoRedoStack", "Redoing: " + d.change);
       bufferStack.push(redoStack.pop());
+      return d;
     }
     else{
       Log.i("UndoRedoStack", "Can't redo, redoStack is empty");
     }
+    return null;
   }
   
   public void wipeRedo(){
     redoStack.clear();
+  }
+  
+  public Move getBufferTop(){
+    if (!bufferStack.empty()){
+      return bufferStack.peek();
+    }
+    return null;
   }
   
 }

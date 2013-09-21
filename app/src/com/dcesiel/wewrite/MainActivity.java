@@ -18,7 +18,7 @@ public class MainActivity extends Activity {
   public static final String SESSION_TAGS = "";
   
   private EditText text;
-  //private Stack<UndoRedoData> undoRedoStack;
+  private TextManager textManager;
   private Button undo;
   private Button redo;
 
@@ -26,51 +26,28 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        
-        //undoRedoStack = new Stack<UndoRedoData>();
-        
+    
         text = (EditText) findViewById(R.id.textBox);
         undo = (Button) findViewById(R.id.undo);
         redo = (Button) findViewById(R.id.redo);
+        textManager = new TextManager(text);
         
         undo.setOnClickListener(undoButtonHandler);
         redo.setOnClickListener(redoButtonListner);
-        
-        
-        text.addTextChangedListener(new TextWatcher(){
-            public void onTextChanged(CharSequence s, int start, int before, int count){
-              Log.i("TextBuffer", "Char: " + " " + s.charAt(start) + " Value: " + start);
-              //undoRedoStack.push(new UndoRedoData(s.charAt(start), start));
-            }
-
-            @Override
-            public void afterTextChanged(Editable s)
-            {
-              // TODO Auto-generated method stub
-              
-            }
-
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count,
-                int after)
-            {
-              // TODO Auto-generated method stub
-              
-            }
-        });
-        
         
     }
     
     View.OnClickListener undoButtonHandler = new View.OnClickListener() {
       public void onClick(View v) {
         Log.i("Undo Button:", "Undo Pressed");
+        textManager.undo();
       }
     };
     
     View.OnClickListener redoButtonListner = new View.OnClickListener() {
       public void onClick(View v) {
         Log.i("Redo Button:", "Redo Pressed");
+        textManager.redo();
       }
     };
 
