@@ -1,81 +1,143 @@
 package com.dcesiel.wewrite;
 
+import java.util.Stack;
+
 import android.content.Context;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.widget.EditText;
 
-public class TextManager extends UndoRedoStack
+//Some code based on UndoableTextEditor by jgracik and marwel 
+
+public class TextManager
 {
-  private static final boolean REMOVE = true;
-  private static final boolean INSERT = false;
-  private int prevStart = 0;
-  boolean undoRedoPressed = false;
-  TextManager t = this;
-  EditText text;
+  String TAG = "TextManager";
+  EditText editor;
+  private Stack<EditHistory> undoStack;
+  private Stack<EditHistory> redoStack;
   
-  Move prevMove = new Move();
+  private static final int UNDO = 1;
+  private static final int REDO = 2;
+  private static final int HISTORY_SIZE = 20;
   
+  private boolean undoRedoPressed;
   
   TextManager(EditText ref){
-    text = ref;
-    ref.addTextChangedListener(new TextWatcher(){
+    undoStack = new Stack<EditHistory>();
+    redoStack = new Stack<EditHistory>();
+    undoRedoPressed = false;
+    editor = ref;
+    
+    editor.addTextChangedListener(new TextWatcher(){
+      private CharSequence original, change;
+      
       @Override
       public void afterTextChanged(Editable s) {}
       @Override
-      public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        //Don't change stack info if undoing or redoing
+        if(undoRedoPressed) return;
+        
+        original = s.subSequence(start, start + count);
+        Log.d("TextListener", "beforeTextChanged:  Start: " + start + " Count: " + count + " Original Text: [" + original + "]");
+      }
       @Override
       public void onTextChanged(CharSequence s, int start, int before, int count) {
-        if (!undoRedoPressed){
-          Move current_move = new Move();
-          if (prevMove == null){
-            prevMove = new Move();
-          }
-          if(prevStart != start && prevMove.change != " "){
-            t.push(prevMove);
-            Log.d("Adding a move:", prevMove.change);
-            prevMove.change.concat(" ");
-            prevStart = start;
-          }
-          current_move.start_coordinate = start;
-          current_move.old_length = before;
-          current_move.new_length = count;
-          current_move.change = s.toString().substring(start, start+count);
-          if (before > count){
-            current_move.type = REMOVE;
-          }
-          else{
-            current_move.type = INSERT;
-          }
-          prevMove = current_move;
+        //Don't change stack info if undoing or redoing
+        if (undoRedoPressed) return;
+        
+        change = s.subSequence(start, start + count);
+        Log.d("TextListener", "onTextChanged:  Start: " + start + " Count: " + count + " Original Text: [" + change + "]");
+        
+        undoStack.push(new EditHistory(start, original, change));
+        
+        // Listener sometimes creates random duplicate events with some keyboards 
+        if(change.toString().equals(original.toString())) {
+          Log.d("Duplicate removal", "Removed duplicate");
+          undoStack.pop();
         }
-      }
+        
+        if(undoStack.size() > HISTORY_SIZE) {
+          undoStack.remove(0);  // remove from bottom of stack
+        }
+        //Wipe redo stack if on a new edit
+        redoStack.clear();
+      } 
     });
   }
   
-  @Override
-  public Move undo()
+  public EditHistory edit(EditHistory edit, int type)
   {
-    Move move = super.undo();
-    if (move != null){
-      if (move.type = REMOVE){
-        Editable currentText = text.getText();
-        undoRedoPressed = true;
-        currentText.replace(move.start_coordinate, (move.start_coordinate + move.new_length), "");
-        Log.i("TextManager", currentText.toString());
-        text.setText(currentText);
-        text.setSelection(move.start_coordinate);
-      }
+    Editable editor_text = editor.getText();
+    int endIdx = edit.begin;
+    CharSequence csReplacedText;
+    CharSequence csInsertedText;
+    
+    if(type == UNDO) {
+      csReplacedText = edit.originalText;
+      csInsertedText = edit.newText;
+    } else {  //Redo
+      csReplacedText = edit.newText;
+      csInsertedText = edit.originalText;
     }
-    prevMove = super.getBufferTop();
-    undoRedoPressed = false;
-    return move;
+    
+    try {
+      if(edit.newText != null) {
+        endIdx += csInsertedText.length();
+      }
+      
+      editor_text.replace(edit.begin, endIdx, csReplacedText);
+      Log.d(TAG, "replace okay");
+    } catch(IndexOutOfBoundsException ex) {
+      Log.d(TAG, "performEdit exeption: " + ex.toString());
+    }
+    
+    return edit;
   }
   
-  @Override
-  public Move redo()
+  public void undo()
   {
-    return super.redo();
+    if(undoStack.empty()) {
+      Log.d(TAG, "nothing to undo");
+      return;
+    }
+    
+    //Lock that prevents listener from adding undo to stack
+    undoRedoPressed = true;
+    EditHistory undoEvent = undoStack.pop();
+    EditHistory edit = edit(undoEvent, UNDO);
+    redoStack.push(edit);
+    undoRedoPressed = false;
   }
+  
+  public void redo()
+  {
+    if(redoStack.empty()){
+      Log.d(TAG, "nothing to redo");
+      return;
+    }
+    
+    //Lock that prevents listener from adding undo to stack
+    undoRedoPressed = true;
+    EditHistory redoEvent = redoStack.pop();
+    EditHistory edit = edit(redoEvent, REDO);
+    undoStack.push(edit);
+    undoRedoPressed = false;
+  }
+  
+  
+  private class EditHistory
+  {
+    int begin;
+    CharSequence originalText;
+    CharSequence newText;
+    
+    public EditHistory(int start, CharSequence originalText, CharSequence newText){
+      this.begin = start;
+      this.originalText = originalText;
+      this.newText = newText;
+    }
+  }
+  
 }
