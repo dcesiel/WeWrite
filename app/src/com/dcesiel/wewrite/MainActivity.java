@@ -50,8 +50,6 @@ public class MainActivity extends Activity {
         textManager.redo();
       }
     };
-
-    
     
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

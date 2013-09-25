@@ -1,0 +1,21 @@
+package wewrite;
+
+option java_package = "com.dcesiel.wewrite";
+option java_outer_classname = "TextChangeProtos";
+
+message TextChange {
+	//Session number
+	required int32 session = 1;
+	
+	//Added||deleted.  If true, user added text.  If false, user deleted text.
+	optional bool added = 2;
+	
+	//Position of add (after which char index)
+	optional int32 position = 3;
+	
+	//Number of values added or deleted
+	optional int32 count = 4;
+	
+	//String added
+	optional string addString = 5;
+}
