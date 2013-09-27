@@ -9,6 +9,7 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
 
@@ -21,6 +22,7 @@ public class MainActivity extends Activity {
   private TextManager textManager;
   private Button undo;
   private Button redo;
+  private Button startSessionButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,14 +32,16 @@ public class MainActivity extends Activity {
         text = (EditText) findViewById(R.id.textBox);
         undo = (Button) findViewById(R.id.undo);
         redo = (Button) findViewById(R.id.redo);
+        startSessionButton = (Button) findViewById(R.id.startSessionButton);
         textManager = new TextManager(text);
         
-        undo.setOnClickListener(undoButtonHandler);
+        undo.setOnClickListener(undoButtonListener);
         redo.setOnClickListener(redoButtonListner);
+        startSessionButton.setOnClickListener(startSessionButtonListener);
         
     }
     
-    View.OnClickListener undoButtonHandler = new View.OnClickListener() {
+    View.OnClickListener undoButtonListener = new View.OnClickListener() {
       public void onClick(View v) {
         Log.i("Undo Button:", "Undo Pressed");
         textManager.undo();
@@ -48,6 +52,12 @@ public class MainActivity extends Activity {
       public void onClick(View v) {
         Log.i("Redo Button:", "Redo Pressed");
         textManager.redo();
+      }
+    };
+    
+    View.OnClickListener startSessionButtonListener = new View.OnClickListener() {
+      public void onClick(View v) {
+        Log.i("Start session button:", "Start session pressed");
       }
     };
     

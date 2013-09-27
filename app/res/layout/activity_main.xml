@@ -24,16 +24,26 @@
         android:id="@+id/undo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/editText1"
-        android:layout_below="@+id/editText1"
+        android:layout_alignLeft="@+id/textBox"
+        android:layout_below="@+id/textBox"
         android:text="Undo" />
 
     <Button
         android:id="@+id/redo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/editText1"
+        android:layout_alignBaseline="@+id/undo"
+        android:layout_alignBottom="@+id/undo"
         android:layout_toRightOf="@+id/undo"
         android:text="Redo" />
+
+    <Button
+        android:id="@+id/startSessionButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/redo"
+        android:layout_alignBottom="@+id/redo"
+        android:layout_alignRight="@+id/textBox"
+        android:text="Start Session" />
 
 </RelativeLayout>
