@@ -44,6 +44,6 @@
         android:layout_alignBaseline="@+id/redo"
         android:layout_alignBottom="@+id/redo"
         android:layout_alignRight="@+id/textBox"
-        android:text="Start Session" />
+        android:text="Join Session" />
 
 </RelativeLayout>
