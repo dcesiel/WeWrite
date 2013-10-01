@@ -8,5 +8,5 @@ message TextChange {
 	optional int32 newIndex = 2;
 	optional string oldText = 3;
 	optional string newText = 4;
-	optional string userId = 5;
+	optional int64 userId = 5;
 }
