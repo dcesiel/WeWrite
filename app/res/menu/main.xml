@@ -2,11 +2,15 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android" >
     
     <item android:id="@+id/undo"
+        <!-- Icon from http://www.webdesignerdepot.com/ -->
+        android:icon="@drawable/undo_icon"
         android:title="Undo" 
         android:showAsAction="ifRoom"
         android:onClick="undo" />
     
     <item android:id="@+id/redo" 
+        <!-- Icon from http://www.webdesignerdepot.com/ -->
+        android:icon="@drawable/redo_icon"
         android:title="Redo" 
         android:showAsAction="ifRoom"
         android:onClick="redo" />
