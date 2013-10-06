@@ -1,9 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android" >
-
-    <item
-        android:id="@+id/action_settings"
-        android:orderInCategory="100"
-        android:showAsAction="never"
-        android:title="@string/action_settings"/>
-
+    
+    <item android:id="@+id/undo"
+        android:title="Undo" 
+        android:showAsAction="ifRoom"
+        android:onClick="undo" />
+    
+    <item android:id="@+id/redo" 
+        android:title="Redo" 
+        android:showAsAction="ifRoom"
+        android:onClick="redo" />
 </menu>
