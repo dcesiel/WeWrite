@@ -17,9 +17,9 @@
 	        android:layout_width="match_parent"
 	        android:layout_height="match_parent"
 	        android:layout_marginTop="5sp"
+	        android:inputType="textFilter|textNoSuggestions|textMultiLine"
 	        android:background="@android:color/white"
 	        android:gravity="top"
-	        android:inputType="textMultiLine"
 	        android:maxWidth="30dp"
 	        android:padding="15dp"
 	        android:textSize="18sp" />
