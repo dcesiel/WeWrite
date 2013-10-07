@@ -12,7 +12,7 @@
 	    android:layout_alignParentTop="true"
 	    android:background="@android:color/black" >
 
-	    <EditText
+	    <com.dcesiel.wewrite.ExtendedEditText
 	        android:id="@+id/editorBox"
 	        android:layout_width="match_parent"
 	        android:layout_height="match_parent"

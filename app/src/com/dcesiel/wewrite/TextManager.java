@@ -1,182 +1,330 @@
 package com.dcesiel.wewrite;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Random;
 import java.util.Stack;
+import java.util.TreeSet;
 
-import android.R.string;
-import android.widget.EditText;
-import android.widget.TextView;
+import android.annotation.SuppressLint;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.text.Selection;
 import android.util.Log;
 
+import com.dcesiel.wewrite.ExtendedEditText.onSelectionChangedListener;
+import com.dcesiel.wewrite.EditorEventProto.EditorEvent;
 
-@SuppressWarnings("unused")
-public class TextManager {
+public class TextManager
+{
+  private static final int HISTORY_SIZE = 20;  
+  private Stack<EditorEvent> undoStack;
+  private Stack<EditorEvent> redoStack;
+  private TreeSet<Integer> undosToSend;
+  private TreeSet<Integer> redosToSend;
+  private TreeSet<Integer> pendingEvent;
+  
+  private static final int UNDO = 1;
+  private static final int REDO = 2;
 
-	private static final boolean REMOVE = true;
-	private static final boolean INSERT = false;
+  private EditorListener editorListener; 
+  private long userId;
+  private boolean connected;
+  private boolean needToSync;
+  private boolean syncing;
+  private int cursorOffset;
+  private int lastCursorIndex;
+  
+  private ExtendedEditText extendedEditText;
+  
+  //Locks to prevent events and undos/redos from happening improperly
+  private boolean undoingOrRedoing; 
+  private boolean generatingEvent;  
+  
+  private static final String TAG = "TextManager";
+  
+  private TextManagerEvent textManagerEvent;
+  
+  public TextManager(ExtendedEditText edittext)
+  {
+    extendedEditText = edittext;
+    connected = false;
+    needToSync = false;
+    syncing = false;
+    cursorOffset = 0;
+    lastCursorIndex = 0;
+    userId = 0L;
+    
+    undoStack = new Stack<EditorEvent>();
+    redoStack = new Stack<EditorEvent>();
+    undosToSend = new TreeSet<Integer>();
+    redosToSend = new TreeSet<Integer>();
+    pendingEvent = new TreeSet<Integer>();
 
-  private MainActivity docEdit;
-  private EditText inputText;
-  private TextWatcher collectText;
-  private Buffer undoRedoList;
-	
-	private int cursorIndex;
-  private Move moveToAdd;
+    undoingOrRedoing = false;
+    generatingEvent = false;
+    
+    editorListener = new EditorListener();
+    extendedEditText.addTextChangedListener(editorListener);
+    extendedEditText.addOnSelectionChangedListener(editorListener);
+  }
 
-  private int userId;
-	private Random r;
+  
+  public void setTextManagerEventListener(TextManagerEvent e) 
+  {
+    textManagerEvent = e;
+  }
+  
+  public EditorEvent createCursorEvent(int cursorIndex)
+  {
+    EditorEvent editorEvent = EditorEvent.newBuilder().setNewCursorIdx(cursorIndex).setUserid(userId).build();   
+    return editorEvent;
+  }
+  
+  public EditorEvent createUndoRedoEvent(EditorEvent e, int type)
+  {
+    // swap text ordering
+    CharSequence csReplace = e.getOldText();
+    CharSequence csOther = e.getNewText();
+    
+    EditorEvent ee = EditorEvent.newBuilder()
+        .setBeginIndex(e.getBeginIndex())
+        .setNewText(csReplace.toString())
+        .setOldText(csOther.toString())
+        .setNewCursorIdx(extendedEditText.getSelectionStart())
+        .setUserid(userId)
+    .build();
+    
+    lastCursorIndex = extendedEditText.getSelectionStart();
+    int eventId = textManagerEvent.sendEvent(ee, "TEXT_CHANGE");
+    textManagerEvent.setChangeId(eventId);
+    if(type == UNDO) {
+      undosToSend.add(eventId);
+    } else {
+      redosToSend.add(eventId);
+    }
+    
+    return ee;
+  }
+    
+  public void setUserID(long id) 
+  {
+    userId = id;
+    connected = true;
+  }
+  
+  public void setNeedToSync(boolean b) 
+  {
+    needToSync = b;
+  }
+  
+  public boolean needsToSync()
+  {
+    Log.d("SYNC", "needToSync: " + needToSync);
+    return needToSync;
+  }
+  
+  public boolean checkNotBusy()
+  {
+    return !syncing && !undoingOrRedoing && !generatingEvent;
+  }
+  
+  public void sync(String s)
+  {
+    Log.d("Sync", "Syncing");
+    syncing = true;
+    extendedEditText.removeTextChangedListener(editorListener);
+    extendedEditText.removeOnSelectionChangedListener();
+    
+    int origIdx = extendedEditText.getSelectionStart() + cursorOffset;
+    extendedEditText.setText(s);
+    
+    if(origIdx <= extendedEditText.length()) {
+      extendedEditText.setSelection(origIdx);
+    } else {
+      extendedEditText.setSelection(extendedEditText.length());
+    }
+    needToSync = false;
+    cursorOffset = 0;
+    
+    extendedEditText.addOnSelectionChangedListener(editorListener);
+    extendedEditText.addTextChangedListener(editorListener);
+    syncing = false;
+  }
+  
+  public void updateCursorOffset(EditorEvent editorEvent)
+  {
+    if(editorEvent.getBeginIndex() > (extendedEditText.getSelectionStart() + cursorOffset)) {
+      return;
+    }
 
-	private String globalText;
+    int endIndex = editorEvent.getBeginIndex();
+    CharSequence csNew = editorEvent.getNewText();
+    CharSequence csOld = editorEvent.getOldText();
+    
+    if(csNew.length() == 0) {
+      endIndex += csOld.length();
+    } else if(csOld.length() == 0) {
+      endIndex += csNew.length();
+    }
+    
+    cursorOffset += (endIndex - editorEvent.getBeginIndex());
+  }
+  
+  public void redo()
+  {
+    if(redoStack.empty()){
+      Log.d(TAG, "nothing to redo");
+      return;
+    }
+    
+    undoingOrRedoing = true;
+    EditorEvent redoEvent = redoStack.pop();
+    createUndoRedoEvent(redoEvent, REDO);
+    undoingOrRedoing = false; 
+    Log.d(TAG, "redo()");
+  }
+  
+  public void undo()
+  {
+    if(undoStack.empty()) {
+      Log.d(TAG, "nothing to undo");
+      return;
+    }
+    Log.d(TAG, "undo()");
+    
+    //Set lock
+    undoingOrRedoing = true;
+    EditorEvent undoEvent = undoStack.pop();
+    createUndoRedoEvent(undoEvent, UNDO);
+    undoingOrRedoing = false;
+  }
+  
+  public void updateUndoRedoStacks(EditorEvent ee)
+  {
+    updateStack(undoStack, ee);
+    updateStack(redoStack, ee);
+  }
+  
+  public void updateStack(Stack<EditorEvent> history, EditorEvent ee)
+  {
+    int newIdx = ee.getBeginIndex();
+    for(int i = 0; i < history.size(); i++)
+    {
+      EditorEvent inStack = history.get(i);
+      if(newIdx <= inStack.getBeginIndex()) {
+        int replaceIdx = inStack.getBeginIndex() + (ee.getNewText().length() - ee.getOldText().length());
+        EditorEvent replacement = EditorEvent.newBuilder()
+            .setBeginIndex(replaceIdx)
+            .setNewText(inStack.getNewText())
+            .setOldText(inStack.getOldText())
+            .setNewCursorIdx(replaceIdx + inStack.getNewText().length())
+            .setUserid(userId)
+        .build();
+        history.set(i, replacement);
+      }
+      else if(ee.getUserid() != inStack.getUserid() &&
+              newIdx > inStack.getBeginIndex() && 
+              newIdx < (inStack.getBeginIndex() + inStack.getNewText().length())) {
+        history.remove(i);
+      }
+    }
+  } 
+  
+  public void confirmEvent(final int id, final EditorEvent editorEvent)
+  {
+    if(pendingEvent.contains(id)) {
+      undoStack.push(editorEvent);
+      if(undoStack.size() > HISTORY_SIZE) {
+        undoStack.remove(0);
+      }
+      pendingEvent.remove(id);
+    } else if(undosToSend.contains(id)) {
+      textManagerEvent.forceNextSync();
+      redoStack.push(editorEvent);
+      if(redoStack.size() > HISTORY_SIZE) {
+        redoStack.remove(0);
+      }
+      extendedEditText.setSelection(editorEvent.getBeginIndex());
+      undosToSend.remove(id);
+    } else if(redosToSend.contains(id)) {
+      textManagerEvent.forceNextSync();
+      undoStack.push(editorEvent);
+      if(undoStack.size() > HISTORY_SIZE) {
+        undoStack.remove(0);
+      }
+      try {
+        extendedEditText.setSelection(editorEvent.getBeginIndex() + editorEvent.getNewText().length());
+      } catch(IndexOutOfBoundsException e) {
+        Log.e(TAG, "set cursor index out of bounds");
+      }
+      redosToSend.remove(id);
+    }
+  }
+  
+  private class EditorListener implements TextWatcher, onSelectionChangedListener
+  {
+    private CharSequence orig, change;
+    private int beginIndex, cursorIndex;
+    private boolean duplicate = false;
+    
+    public void beforeTextChanged(CharSequence s, int start, int count, int after)
+    {
+      if(undoingOrRedoing || syncing) return;
+      generatingEvent = true;
+      beginIndex = start;
+      orig = s.subSequence(start, start + count);
+    }
+    
+    public void onTextChanged(CharSequence s, int start, int before, int count)
+    {
+      if(undoingOrRedoing || syncing) return;
+      change = s.subSequence(start, start + count);
+    }
 
-	//Temp variables used for undo/redo
-	Editable editable;
-  Move tmpMove;
-	
-	//constructor
-	TextManager(EditText ref, MainActivity docEditSrc){
-    inputText = ref;
-    globalText = "";
-    docEdit = docEditSrc;
-		userId = 8765445;
-		cursorIndex = 0;
-		undoRedoList = new Buffer();
-		newTextWatch();
-		inputText.addTextChangedListener(collectText);
-	}
+    public void afterTextChanged(Editable s)
+    {
+      //Check lock before registering change.  Could be undo/redo
+      if(undoingOrRedoing || syncing) return;
+      
+      // create EditorEvent object
+      EditorEvent textChange = EditorEvent.newBuilder()
+          .setBeginIndex(beginIndex + cursorOffset)
+          .setNewText(change.toString())
+          .setOldText(orig.toString())
+          .setNewCursorIdx(extendedEditText.getSelectionStart())
+          .setUserid(userId)
+      .build();
+      
+      if(connected && !duplicate) {
+        int eventId = textManagerEvent.sendEvent(textChange, "TEXT_CHANGE");
+        textManagerEvent.setChangeId(eventId);
+        pendingEvent.add(eventId);
+      }
+      
+      duplicate = false;
+      generatingEvent = false;
+    }
 
-	private void newTextWatch(){
-		collectText = new TextWatcher() {
-			@Override
-			public void afterTextChanged(Editable s) {}
+    @Override
+    public void onSelectionChanged(int selStart, int selEnd)
+    {
+      //Send to server
+      if(!generatingEvent) {
+        cursorIndex = selStart;
+        if(cursorIndex == lastCursorIndex) return;
+        
+        EditorEvent ee = createCursorEvent(cursorIndex);
+        textManagerEvent.setChangeId(textManagerEvent.sendEvent(ee, "CURSOR_CHANGE"));
+      } else {
+        generatingEvent = true;
+      }
+    }
+    
+  } 
 
-			@Override
-			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-					if (count > after) {
-						moveToAdd = new Move(start+after, count-after, s.toString().substring(start+after, start+count), REMOVE);
-						printMove(moveToAdd);
-						undoRedoList.add(moveToAdd);
-						cursorIndex = moveToAdd.start;
-						docEdit.broadcastMessage(REMOVE, moveToAdd.start, moveToAdd.change, userId);
-					}
-			}
-
-			@Override
-			public void onTextChanged(CharSequence s, int start, int before, int count) {
-				if(count > before){
-					moveToAdd = new Move(start+before, count-before, s.toString().substring(start+before, start+count), INSERT);
-					printMove(moveToAdd);
-					undoRedoList.add(moveToAdd);
-					cursorIndex = moveToAdd.start+moveToAdd.length;
-					docEdit.broadcastMessage(INSERT, moveToAdd.start, moveToAdd.change, userId);
-				}
-			}
-		};
-	}
-
-	public void undo(){
-		tmpMove = undoRedoList.getUndo();
-		if (tmpMove == null) {
-			Log.d("Undo", "Nothing left to undo");
-			return;
-		}
-		//Remove listener that looks for text changes because we don't want it listening for undos and redos
-		//and adding them again to the undo/redo buffer
-		inputText.removeTextChangedListener(collectText);
-		editable = inputText.getText();
-		if (tmpMove.type == INSERT) {
-			editable.delete(tmpMove.start, tmpMove.start + tmpMove.length);
-			cursorIndex = tmpMove.start;
-			inputText.setText(editable);
-			docEdit.broadcastMessage(REMOVE, tmpMove.start, tmpMove.change, userId);
-			inputText.setSelection(cursorIndex);
-		} 
-		else{
-			CharSequence insert = editable.insert(tmpMove.start, tmpMove.change);
-			inputText.setText(insert);
-			docEdit.broadcastMessage(INSERT, tmpMove.start, tmpMove.change, userId);
-			cursorIndex = tmpMove.start + tmpMove.length;
-			inputText.setSelection(cursorIndex);
-		}
-		newTextWatch();
-		inputText.addTextChangedListener(collectText);
-	}
-
-	public void redo(){
-		tmpMove = undoRedoList.getRedo();
-		if(tmpMove == null){
-			Log.d("Redo", "Nothing left to redo");
-			return;
-		}
-		inputText.removeTextChangedListener(collectText);
-		editable = inputText.getText();
-		printMove(tmpMove);
-		if(tmpMove.type == REMOVE){
-			editable.delete(tmpMove.start, tmpMove.start + tmpMove.length);
-			cursorIndex = tmpMove.start;
-			inputText.setText(editable);
-			docEdit.broadcastMessage(REMOVE, tmpMove.start, tmpMove.change, userId);
-			inputText.setSelection(cursorIndex);
-		} 
-		else{
-			CharSequence insert = editable.insert(tmpMove.start, tmpMove.change);
-			inputText.setText(insert);
-			docEdit.broadcastMessage(INSERT, tmpMove.start, tmpMove.change, userId);
-			cursorIndex = tmpMove.start + tmpMove.length;
-			inputText.setSelection(cursorIndex);
-		}
-		newTextWatch();
-		inputText.addTextChangedListener(collectText);
-	}
-	
-	
-	void updateLocal(int start, int length, String s, boolean type, int id){
-		inputText.removeTextChangedListener(collectText);
-		if(start > globalText.length()){
-			start = globalText.length();
-		}
-		String tmpFirst = globalText.substring(0, start);
-		if(type == REMOVE){
-			String tmpSecond = globalText.substring(start+length);
-			tmpFirst = tmpFirst.concat(tmpSecond);
-		}
-		else{
-			String temp_second = globalText.substring(start);
-			tmpFirst = tmpFirst.concat(s);
-			tmpFirst = tmpFirst.concat(temp_second);
-		}
-		globalText = tmpFirst;
-		if(id != userId){
-			int curLoc = inputText.getSelectionStart();
-			Log.e("CURSOR LOCATION: ", String.valueOf(curLoc));
-			inputText.setText((CharSequence) globalText);
-			undoRedoList.offset(start, length, type);
-			if(type && curLoc > start){
-				inputText.setSelection(curLoc-length);
-			}
-			else if(!type && curLoc > start){
-				inputText.setSelection(curLoc+length-1);
-			}
-			else{
-				inputText.setSelection(curLoc);
-			}
-		}
-		newTextWatch();
-		inputText.addTextChangedListener(collectText);
-	}
-	
-	//testing function
-	private void printMove(Move m) {
-		Log.d("MOVE start index:", String.valueOf(m.start));
-		Log.d("MOVE length:", String.valueOf(m.length));
-		Log.d("MOVE change:", m.change);
-		Log.d("MOVE type:", String.valueOf(m.type));
-	}
-
+  //Interface to notify other classes of editor changes
+  public interface TextManagerEvent {
+    public int sendEvent(EditorEvent ee, String type);
+    public void triggerSync();
+    public void forceNextSync();
+    public void setChangeId(int id);
+  }
+  
 }
