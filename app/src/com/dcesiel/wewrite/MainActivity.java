@@ -221,7 +221,7 @@ public class MainActivity extends Activity implements TextManagerEvent
       editTextCursor.setEnabled(true);
       editTextCursor.setFocusableInTouchMode(true);
       editTextCursor.setFocusable(true);
-      editTextCursor.setHint("Type here");
+      editTextCursor.setHint("");
       editTextCursor.requestFocus();
       sync.postDelayed(timeKeep, 2000);
     } catch(Exception e) {
